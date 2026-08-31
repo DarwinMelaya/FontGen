@@ -37,6 +37,13 @@ const FACEBOOK_CHAR_LIMIT = 63206;
 const toolbarButtonClass =
   "rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted transition hover:border-border-strong hover:bg-input hover:text-primary disabled:opacity-30";
 
+const mobileBoldButtonClass =
+  "rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold text-primary transition active:scale-[0.98]";
+
+const preventSelectionLoss = (event: React.MouseEvent | React.PointerEvent) => {
+  event.preventDefault();
+};
+
 const smoothEase = [0.22, 1, 0.36, 1] as Transition["ease"];
 
 const pageVariants = {
@@ -66,6 +73,8 @@ const staggerItem = {
 
 const MainPage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const savedSelectionRef = useRef({ start: 0, end: 0 });
+  const selectionUiTimerRef = useRef<number | undefined>(undefined);
   const [text, setText] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [activeStyle, setActiveStyle] = useState<FancyFontStyle>("bold-sans");
@@ -76,6 +85,36 @@ const MainPage = () => {
   const [autoCopy, setAutoCopy] = useState(false);
   const [includeHashtagsOnCopy, setIncludeHashtagsOnCopy] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [selectionLength, setSelectionLength] = useState(0);
+
+  const captureSelection = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    savedSelectionRef.current = { start, end };
+
+    window.clearTimeout(selectionUiTimerRef.current);
+    selectionUiTimerRef.current = window.setTimeout(() => {
+      setSelectionLength(Math.max(0, end - start));
+    }, 250);
+  }, []);
+
+  const getSelectionRange = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return savedSelectionRef.current;
+
+    const liveStart = textarea.selectionStart;
+    const liveEnd = textarea.selectionEnd;
+
+    if (liveStart !== liveEnd) {
+      savedSelectionRef.current = { start: liveStart, end: liveEnd };
+      return savedSelectionRef.current;
+    }
+
+    return savedSelectionRef.current;
+  };
 
   const showToast = (message: string) => {
     setToast(message);
@@ -121,8 +160,7 @@ const MainPage = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
+    const { start, end } = getSelectionRange();
     if (start === end) {
       showToast("Select text first");
       return;
@@ -174,7 +212,7 @@ const MainPage = () => {
     const textarea = textareaRef.current;
     if (!textarea || !text) return;
 
-    const cursor = textarea.selectionStart;
+    const { start: cursor } = getSelectionRange();
     const lineStart = text.lastIndexOf("\n", cursor - 1) + 1;
     const lineEndIndex = text.indexOf("\n", cursor);
     const lineEnd = lineEndIndex === -1 ? text.length : lineEndIndex;
@@ -405,7 +443,64 @@ const MainPage = () => {
   const handleCopyFull = () => copyText(getFullOutput(), "Copied for Facebook");
 
   const inputClassName =
-    "w-full resize-y rounded-xl border border-border bg-input p-4 text-sm text-primary outline-none placeholder:text-faint focus:border-border-strong focus:ring-1 focus:ring-border";
+    "w-full resize-y rounded-xl border border-border bg-input p-4 text-base text-primary outline-none placeholder:text-faint focus:border-border-strong focus:ring-1 focus:ring-border select-text touch-manipulation sm:text-sm";
+
+  const renderBoldStylePicker = (compact = false) => (
+    <div className={`flex gap-2 ${compact ? "touch-pan-x overflow-x-auto pb-1" : "flex-col space-y-2"}`}>
+      {FANCY_FONT_STYLES.map((style) => {
+        const { label, sample, hint } = FONT_STYLE_LABELS[style];
+        const isActive = activeStyle === style;
+
+        if (compact) {
+          return (
+            <button
+              key={style}
+              type="button"
+              onMouseDown={preventSelectionLoss}
+              onPointerDown={preventSelectionLoss}
+              onClick={() => setActiveStyle(style)}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-left transition ${
+                isActive
+                  ? "border-border-strong bg-accent text-accent-text"
+                  : "border-border bg-card text-primary"
+              }`}
+            >
+              <span className="block text-[10px] font-semibold uppercase tracking-wide opacity-80">
+                {label}
+              </span>
+              <span className="block text-lg leading-none">{sample}</span>
+            </button>
+          );
+        }
+
+        return (
+          <button
+            key={style}
+            type="button"
+            onClick={() => setActiveStyle(style)}
+            className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
+              isActive
+                ? "border-border-strong bg-accent-soft"
+                : "border-border bg-card hover:border-border-strong"
+            }`}
+          >
+            <span
+              className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                isActive ? "border-primary" : "border-border-strong"
+              }`}
+            >
+              {isActive && <span className="h-2 w-2 rounded-full bg-primary" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium text-primary">{label}</span>
+              <span className="mt-0.5 block text-lg leading-none">{sample}</span>
+              <span className="mt-1 block text-xs text-faint">{hint}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <motion.div
@@ -414,7 +509,7 @@ const MainPage = () => {
       initial="hidden"
       animate="show"
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-32 sm:px-6 lg:pb-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -530,13 +625,68 @@ const MainPage = () => {
                 value={text}
                 onChange={(event) => setText(event.target.value)}
                 onKeyDown={handleKeyDown}
+                onSelect={captureSelection}
+                onKeyUp={captureSelection}
+                onMouseUp={captureSelection}
+                onFocus={captureSelection}
                 placeholder="Paste or type your pubmat text here..."
-                rows={18}
-                className={`${inputClassName} leading-relaxed`}
+                rows={14}
+                className={`${inputClassName} min-h-[220px] leading-relaxed lg:min-h-[360px]`}
               />
 
+              <div className="mt-3 space-y-3 rounded-xl border border-border bg-card p-3 lg:hidden">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-faint">
+                    Bold tools
+                  </p>
+                  <span className="text-xs text-muted">
+                    {selectionLength > 0
+                      ? `${selectionLength} chars selected`
+                      : "Highlight text first"}
+                  </span>
+                </div>
+
+                {renderBoldStylePicker(true)}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onMouseDown={preventSelectionLoss}
+                    onPointerDown={preventSelectionLoss}
+                    onClick={() => void applyStyleAndMaybeCopy(activeStyle)}
+                    className="col-span-2 rounded-xl bg-accent py-3 text-sm font-semibold text-accent-text transition active:scale-[0.98]"
+                  >
+                    Bold selection · {FONT_STYLE_LABELS[activeStyle].label}
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={preventSelectionLoss}
+                    onPointerDown={preventSelectionLoss}
+                    onClick={() => convertCurrentLine(activeStyle)}
+                    className={mobileBoldButtonClass}
+                  >
+                    Bold line
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={preventSelectionLoss}
+                    onPointerDown={preventSelectionLoss}
+                    onClick={handleUndo}
+                    disabled={history.length === 0}
+                    className={`${mobileBoldButtonClass} disabled:opacity-30`}
+                  >
+                    Undo
+                  </button>
+                </div>
+              </div>
+
               <p className="mt-3 text-xs text-faint">
-                Ctrl+B toggle bold · Ctrl+Z undo · Ctrl+Y redo · Draft auto-saves
+                <span className="hidden lg:inline">
+                  Ctrl+B toggle bold · Ctrl+Z undo · Ctrl+Y redo · Draft auto-saves
+                </span>
+                <span className="lg:hidden">
+                  Highlight text, pick style, tap Bold · Draft auto-saves
+                </span>
               </p>
             </AppCard>
             </motion.div>
@@ -659,48 +809,10 @@ const MainPage = () => {
           </motion.div>
 
           <motion.div className="space-y-5" variants={staggerItem}>
+            <div className="hidden space-y-5 lg:block">
             <motion.div variants={staggerItem}>
             <AppCard label="Font Style">
-              <div className="space-y-2">
-                {FANCY_FONT_STYLES.map((style) => {
-                  const { label, sample, hint } = FONT_STYLE_LABELS[style];
-                  const isActive = activeStyle === style;
-
-                  return (
-                    <button
-                      key={style}
-                      type="button"
-                      onClick={() => setActiveStyle(style)}
-                      className={`flex w-full items-start gap-3 rounded-xl border p-3 text-left transition ${
-                        isActive
-                          ? "border-border-strong bg-accent-soft"
-                          : "border-border bg-card hover:border-border-strong"
-                      }`}
-                    >
-                      <span
-                        className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                          isActive ? "border-primary" : "border-border-strong"
-                        }`}
-                      >
-                        {isActive && (
-                          <span className="h-2 w-2 rounded-full bg-primary" />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-medium text-primary">
-                          {label}
-                        </span>
-                        <span className="mt-0.5 block text-lg leading-none">
-                          {sample}
-                        </span>
-                        <span className="mt-1 block text-xs text-faint">
-                          {hint}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              {renderBoldStylePicker()}
             </AppCard>
             </motion.div>
 
@@ -735,6 +847,7 @@ const MainPage = () => {
               </div>
             </AppCard>
             </motion.div>
+            </div>
 
             <motion.div variants={staggerItem}>
             <AppCard label="Settings">
@@ -779,6 +892,33 @@ const MainPage = () => {
             </motion.div>
           </motion.div>
         </motion.div>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 p-3 backdrop-blur-lg lg:hidden pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto flex max-w-6xl items-center gap-2">
+          <button
+            type="button"
+            onMouseDown={preventSelectionLoss}
+            onPointerDown={preventSelectionLoss}
+            onClick={() => void applyStyleAndMaybeCopy(activeStyle)}
+            className="flex-1 rounded-xl bg-accent py-3.5 text-sm font-semibold text-accent-text active:scale-[0.98]"
+          >
+            Bold · {FONT_STYLE_LABELS[activeStyle].sample}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyFull}
+            disabled={!getFullOutput().trim()}
+            className="rounded-xl border border-border bg-card px-4 py-3.5 text-sm font-semibold text-primary disabled:opacity-40"
+          >
+            Copy
+          </button>
+        </div>
+        <p className="mx-auto mt-2 max-w-6xl text-center text-[10px] text-faint">
+          {selectionLength > 0
+            ? `${selectionLength} characters ready to bold`
+            : "Select text in the editor, then tap Bold"}
+        </p>
       </div>
 
       <footer className="border-t border-border py-6 text-center text-xs text-faint">
