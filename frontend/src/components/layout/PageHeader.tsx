@@ -17,34 +17,57 @@ const PageHeader = ({
   showHomeLink = false,
   children,
 }: PageHeaderProps) => {
+  const logo = (
+    <span className="flex items-center gap-2.5">
+      <AppLogo className="h-8 w-auto" alt="" />
+      <span className="text-sm font-semibold tracking-tight text-primary">
+        FontGen
+      </span>
+    </span>
+  );
+
   return (
-    <header className="mb-8 flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <header className="mb-8 flex flex-col gap-8 sm:mb-10">
+      <div className="flex items-center justify-between gap-4 border-b border-border pb-4">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-sm">
           {showHomeLink ? (
-            <Link to="/" className="transition hover:opacity-80">
-              <AppLogo className="h-14 w-auto" />
+            <Link
+              to="/"
+              aria-label="FontGen home"
+              className="rounded-lg transition hover:opacity-75"
+            >
+              {logo}
             </Link>
           ) : (
-            <AppLogo className="h-14 w-auto" />
+            logo
           )}
-          <ThemeToggle />
-        </div>
+          {title && (
+            <>
+              <span className="text-faint" aria-hidden="true">/</span>
+              <span className="font-medium text-muted" aria-current="page">
+                {title}
+              </span>
+            </>
+          )}
+        </nav>
+        <ThemeToggle />
       </div>
 
       {(title || description) && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-faint">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-brand">
               {eyebrow}
             </p>
             {title && (
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-primary">
+              <h1 className="mt-2 font-display text-4xl leading-none tracking-tight text-primary sm:text-5xl">
                 {title}
               </h1>
             )}
             {description && (
-              <p className="mt-2 max-w-xl text-sm text-muted">{description}</p>
+              <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-muted">
+                {description}
+              </p>
             )}
           </div>
           {children}

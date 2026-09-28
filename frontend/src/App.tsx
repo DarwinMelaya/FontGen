@@ -1,10 +1,13 @@
+import { MotionConfig } from "framer-motion";
 import { ThemeProvider } from "./context/ThemeContext";
 import Routers from "./routers/Routers";
 
 const App = () => {
   return (
     <ThemeProvider>
-      <Routers />
+      <MotionConfig reducedMotion="user">
+        <Routers />
+      </MotionConfig>
     </ThemeProvider>
   );
 };
